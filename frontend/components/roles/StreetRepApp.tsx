@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { usePersistentStateAfterMount } from "@/lib/use-persistent-state";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { PriorityBadge } from "@/components/ui/PriorityBadge";
 import { Timeline } from "@/components/ui/Timeline";
@@ -13,14 +14,15 @@ import {
   MOCK_REP_PENDING_REPORTS, LAHORE_INCIDENT_MARKERS,
 } from "@/lib/mock-data";
 import { useAppState } from "@/lib/app-state";
-import { formatRelativeTime, formatDate } from "@/lib/utils";
+import { formatDate, fileToDataUrl } from "@/lib/utils";
+import { ClientTime } from "@/components/ui/ClientTime";
 
 type View = "home" | "verify-list" | "verify-detail" | "contractor-work" | "area-map" | "incidents" | "incident-detail" | "field-report" | "messages" | "profile";
 
 const HEALTH_COLOR = (s: number) => s >= 75 ? "#0E8A5F" : s >= 50 ? "#E0A400" : "#C0392B";
 
 export default function StreetRepApp() {
-  const [view, setView]                     = useState<View>("home");
+  const [view, setView]                     = usePersistentStateAfterMount<View>("cp.streetrep.view", "home");
   const [selectedReportId, setSelectedRep]  = useState<string | null>(null);
   const [selectedIncidentId, setSelectedInc]= useState<string | null>(null);
   const [verifiedIds, setVerifiedIds]       = useState<string[]>([]);
@@ -225,7 +227,7 @@ export default function StreetRepApp() {
             {/* Rep ground-verification photo */}
             <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: "#5A6B84" }}>Your Verification Photo (on ground)</p>
             <input ref={repPhotoInputRef} type="file" accept="image/*" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) setRepVerifyPhoto(URL.createObjectURL(f)); }} />
+              onChange={async (e) => { const f = e.target.files?.[0]; if (f) setRepVerifyPhoto(await fileToDataUrl(f)); }} />
             {!repVerifyPhoto ? (
               <button onClick={() => repPhotoInputRef.current?.click()}
                 className="w-full border-2 border-dashed rounded-2xl py-8 flex flex-col items-center gap-2 mb-4 bg-white" style={{ borderColor: "#E6E3DC" }}>
@@ -378,7 +380,7 @@ export default function StreetRepApp() {
                   <input
                     type="file" accept="image/*" className="hidden"
                     id={`rep-verify-${w.id}`}
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) { verifyLiveReport(w.id, URL.createObjectURL(f)); setView("home"); } }}
+                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) { verifyLiveReport(w.id, await fileToDataUrl(f)); setView("home"); } }}
                   />
 
                   {/* Verify: take matching photo */}
@@ -635,7 +637,7 @@ export default function StreetRepApp() {
                           <p className="text-xs font-bold" style={{ color: "#16233A" }}>{msg.from}</p>
                           <div className="flex items-center gap-1.5">
                             {!msg.read && <span className="w-2 h-2 rounded-full" style={{ background: "#0E8A5F" }} />}
-                            <span className="text-[10px]" style={{ color: "#5A6B84" }}>{formatRelativeTime(msg.sentAt)}</span>
+                            <span className="text-[10px]" style={{ color: "#5A6B84" }}><ClientTime date={msg.sentAt} format="relative" /></span>
                           </div>
                         </div>
                         <p className="text-xs mt-0.5" style={{ color: "#5A6B84" }}>{msg.text}</p>
@@ -689,7 +691,7 @@ export default function StreetRepApp() {
       </div>
 
       {/* ── Bottom Navigation — matches screenshot ── */}
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "white", borderTop: "1px solid #E6E3DC", height: 60, display: "flex", alignItems: "center", justifyContent: "space-around" }}>
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "white", borderTop: "1px solid #E6E3DC", height: 60, display: "flex", alignItems: "center", justifyContent: "space-around", borderBottomLeftRadius: 40, borderBottomRightRadius: 40 }}>
         {[
           { id: "home",        Icon: IconHome,      label: "My Streets" },
           { id: "verify-list", Icon: IconClipboard, label: "Verify",    badge: pendingReports.length },

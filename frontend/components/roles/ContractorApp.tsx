@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { useAppState, type WorkOrder } from "@/lib/app-state";
 import { CategoryBadge, IconCamera, IconCheck, IconArrowLeft, IconMapPin } from "@/components/ui/Icons";
+import { fileToDataUrl } from "@/lib/utils";
 
 const CONTRACTOR_NAME = "Al-Jalil Builders";
 
@@ -22,10 +23,10 @@ export default function ContractorApp() {
   const done   = myOrders.filter((w) => w.status === "COMPLETED" || w.status === "RESOLVED");
   const selected = myOrders.find((w) => w.id === selectedId) || null;
 
-  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setCompletePhoto(URL.createObjectURL(file));
+    setCompletePhoto(await fileToDataUrl(file));
   }
 
   return (

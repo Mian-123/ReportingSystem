@@ -90,3 +90,17 @@ export const PRIORITY_CLASS: Record<PriorityBand, string> = {
 };
 
 export type Role = "citizen" | "street-rep" | "department" | "ministry" | "admin" | "contractor";
+
+
+// Convert an uploaded File into a base64 data URL. Unlike URL.createObjectURL
+// (which returns a blob: URL only valid in the current tab and lost on reload),
+// a data URL is self-contained, so it persists to localStorage and renders in
+// every portal after a refresh.
+export function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}

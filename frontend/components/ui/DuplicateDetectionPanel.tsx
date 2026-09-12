@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { MOCK_DUPLICATE_REPORTS, MOCK_DUPLICATE_SIGNALS, type MockDuplicateReport } from "@/lib/mock-data";
-import { formatRelativeTime } from "@/lib/utils";
+import { ClientTime } from "@/components/ui/ClientTime";
 import { CategoryBadge, IconMerge, IconAI, IconCheck } from "@/components/ui/Icons";
 
 interface DuplicateDetectionPanelProps {
@@ -122,7 +122,7 @@ export function DuplicateDetectionPanel({
                   <p className="text-[11px] text-[#5A6B84] italic truncate mt-0.5">
                     &ldquo;{r.description}&rdquo;
                   </p>
-                  <p className="text-[10px] text-[#9BA8BA]">{formatRelativeTime(r.submittedAt)}</p>
+                  <p className="text-[10px] text-[#9BA8BA]"><ClientTime date={r.submittedAt} format="relative" /></p>
                 </div>
               </div>
             ))}

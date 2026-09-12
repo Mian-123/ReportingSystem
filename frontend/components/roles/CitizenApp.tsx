@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { usePersistentStateAfterMount } from "@/lib/use-persistent-state";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { PriorityBadge } from "@/components/ui/PriorityBadge";
 import { Timeline, EventTimeline } from "@/components/ui/Timeline";
@@ -16,10 +17,12 @@ import {
   MOCK_ANNOUNCEMENTS, LAHORE_INCIDENT_MARKERS, CATEGORY_META, nearbyPOIs,
 } from "@/lib/mock-data";
 import { useAppState } from "@/lib/app-state";
-import { formatRelativeTime, formatDateTime } from "@/lib/utils";
+import { ClientTime } from "@/components/ui/ClientTime";
+import { fileToDataUrl } from "@/lib/utils";
+
 import type { StatusType } from "@/lib/utils";
 
-type View = "home" | "map" | "my-reports" | "alerts" | "profile" | "wizard" | "incident-detail" | "verify";
+type View = "home" | "map" | "my-reports" | "alerts" | "profile" | "wizard" | "incident-detail" | "verify" | "track-report";
 
 const CATEGORIES = [
   "Broken Road", "Garbage / Waste", "Sewerage / Water", "Streetlight",
@@ -34,9 +37,9 @@ function liveStatusToType(s: "SUBMITTED" | "VERIFIED" | "REJECTED"): StatusType 
 }
 
 export default function CitizenApp() {
-  const { liveReports, addReport, workOrders, resolveWorkOrder, deleteReport } = useAppState();
+  const { liveReports, addReport, workOrders, resolveWorkOrder, disputeWorkOrder, deleteReport } = useAppState();
 
-  const [view, setView]                     = useState<View>("home");
+  const [view, setView]                     = usePersistentStateAfterMount<View>("cp.citizen.view", "home");
   const [selectedIncidentId, setSelectedId] = useState<string | null>(null);
   const [step, setStep]                     = useState(0);
   const [wizardCategory, setWizardCategory] = useState("");
@@ -51,7 +54,11 @@ export default function CitizenApp() {
   const [rejectReason, setRejectReason]     = useState("");
   const [verifyDone, setVerifyDone]         = useState(false);
   const [woRating, setWoRating] = useState(0);
+  const [woReview, setWoReview] = useState("");
+  const [reopenForId, setReopenForId] = useState<string | null>(null);
+  const [reopenReason, setReopenReason] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [trackReportId, setTrackReportId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const geo = useGeolocation();
 
@@ -78,11 +85,11 @@ export default function CitizenApp() {
       .map((r) => ({ ...r, repVerified: true, isLive: false })),
   ];
 
-  function handleImageFile(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImageFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setWizardImageFile(file);
-    const url = URL.createObjectURL(file);
+    const url = await fileToDataUrl(file);
     setWizardImagePreview(url);
   }
 
@@ -242,7 +249,7 @@ export default function CitizenApp() {
                         {"repVerified" in r && r.repVerified && r.status === "SUBMITTED" && (
                           <span className="text-[10px] ml-2 font-semibold" style={{ color: "#0E8A5F" }}>✓ Rep verified</span>
                         )}
-                        <p className="text-[10px] mt-1.5" style={{ color: "#5A6B84" }}>Reported {formatDateTime(r.submittedAt)}</p>
+                        <p className="text-[10px] mt-1.5" style={{ color: "#5A6B84" }}>Reported <ClientTime date={r.submittedAt} format="datetime" /></p>
                       </div>
                     </button>
                   ))}
@@ -353,18 +360,50 @@ export default function CitizenApp() {
                             <button key={s} onClick={() => setWoRating(s)} className="text-2xl" style={{ color: s <= woRating ? "#C6A55C" : "#D9D2C4" }}>★</button>
                           ))}
                         </div>
-                        <button onClick={() => resolveWorkOrder(w.id, woRating || 5)}
+                        <textarea value={woReview} onChange={(e) => setWoReview(e.target.value)}
+                          placeholder="Write a short review of the work (optional)…"
+                          className="w-full rounded-xl p-2.5 text-xs resize-none focus:outline-none bg-white mb-2"
+                          style={{ border: "1px solid #E6E3DC", color: "#16233A" }} rows={2} maxLength={300} />
+                        <button onClick={() => { resolveWorkOrder(w.id, woRating || 5); setWoReview(""); }}
                           className="w-full py-3.5 rounded-2xl text-sm font-bold text-white" style={{ background: "#0E8A5F", fontFamily: "Outfit,sans-serif" }}>
                           Submit Rating &amp; Release Payment
                         </button>
-                        <p className="text-xs mt-2 font-semibold underline" style={{ color: "#C0392B", cursor: "pointer" }}>Wait, there is still an issue!</p>
+                        <button onClick={() => { disputeWorkOrder(w.id, "Citizen: there is still an issue with the work"); }}
+                          className="w-full mt-2 text-xs font-semibold underline" style={{ color: "#C0392B", background: "none", border: "none", cursor: "pointer" }}>Wait, there is still an issue!</button>
                       </div>
                     )}
 
                     {w.status === "RESOLVED" && (
-                      <div className="mt-3 rounded-xl p-3 flex items-center gap-2" style={{ background: "#E7F4EF", border: "1px solid #0E8A5F" }}>
-                        <IconCheck size={16} color="#0E8A5F" />
-                        <p className="text-xs font-bold" style={{ color: "#0E8A5F" }}>Resolved · payment released{w.rating ? ` · you rated ${w.rating}★` : ""}</p>
+                      <div className="mt-3 space-y-2">
+                        <div className="rounded-xl p-3 flex items-center gap-2" style={{ background: "#E7F4EF", border: "1px solid #0E8A5F" }}>
+                          <IconCheck size={16} color="#0E8A5F" />
+                          <p className="text-xs font-bold" style={{ color: "#0E8A5F" }}>Resolved · payment released{w.rating ? ` · you rated ${w.rating}★` : ""}</p>
+                        </div>
+                        {w.disputeReason ? (
+                          <div className="rounded-xl p-3" style={{ background: "#FEF0EE", border: "1px solid #F3C0BA" }}>
+                            <p className="text-[11px] font-bold" style={{ color: "#C0392B" }}>You reported a problem with this work</p>
+                            <p className="text-[11px] italic mt-0.5" style={{ color: "#5A6B84" }}>&ldquo;{w.disputeReason}&rdquo;</p>
+                          </div>
+                        ) : reopenForId === w.id ? (
+                          <div className="rounded-xl p-3" style={{ background: "#FEF0EE", border: "1px solid #F3C0BA" }}>
+                            <p className="text-xs font-semibold mb-1.5" style={{ color: "#C0392B" }}>Report a problem with this completed work</p>
+                            <textarea value={reopenReason} onChange={(e) => setReopenReason(e.target.value)}
+                              placeholder="e.g. the pothole reappeared after two days…"
+                              className="w-full rounded-lg p-2.5 text-xs resize-none focus:outline-none bg-white"
+                              style={{ border: "1px solid #E6E3DC", color: "#16233A" }} rows={3} maxLength={400} />
+                            <div className="flex gap-2 mt-2">
+                              <button onClick={() => { disputeWorkOrder(w.id, reopenReason || "Citizen reported a problem with the completed work"); setReopenForId(null); setReopenReason(""); }}
+                                className="flex-1 py-2 rounded-lg text-xs font-bold text-white" style={{ background: "#C0392B" }}>Submit to UC Officer</button>
+                              <button onClick={() => { setReopenForId(null); setReopenReason(""); }}
+                                className="flex-1 py-2 rounded-lg text-xs font-semibold" style={{ background: "white", color: "#5A6B84", border: "1px solid #E6E3DC" }}>Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button onClick={() => { setReopenForId(w.id); setReopenReason(""); }}
+                            className="w-full py-2.5 rounded-xl text-xs font-semibold" style={{ background: "#FEF0EE", color: "#C0392B", border: "1px solid #F3C0BA" }}>
+                            Report a problem with this work
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -399,7 +438,7 @@ export default function CitizenApp() {
                 <p className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: "#0E8A5F" }}>Just submitted</p>
                 {liveReports.map((r) => (
                   <div key={r.id} className="bg-white rounded-2xl border p-4 mb-2" style={{ borderColor: "#0E8A5F", borderLeftWidth: 4, boxShadow: "0 1px 3px rgba(10,31,60,0.07)" }}>
-                    <div className="flex items-start gap-3">
+                    <button onClick={() => { setTrackReportId(r.id); setView("track-report"); }} className="w-full text-left flex items-start gap-3">
                       <CategoryBadge category={r.category} size="lg" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-1">
@@ -413,7 +452,11 @@ export default function CitizenApp() {
                             <span className="text-[10px] font-bold" style={{ color: "#0E8A5F" }}>✓ Verified by Rep</span>
                           )}
                         </div>
-                        <p className="text-[10px] mt-1.5" style={{ color: "#5A6B84" }}>Reported {formatDateTime(r.submittedAt)}</p>
+                        <p className="text-[10px] mt-1.5" style={{ color: "#5A6B84" }}>Reported <ClientTime date={r.submittedAt} format="datetime" /></p>
+                        <p className="text-[10px] mt-1 font-semibold" style={{ color: "#0E8A5F" }}>Tap to track →</p>
+                      </div>
+                    </button>
+                    <div className="pl-[3.25rem]">
 
                         {/* Delete action */}
                         {confirmDeleteId === r.id ? (
@@ -435,7 +478,6 @@ export default function CitizenApp() {
                             Delete report
                           </button>
                         )}
-                      </div>
                     </div>
                   </div>
                 ))}
@@ -457,7 +499,7 @@ export default function CitizenApp() {
                     <p className="text-xs truncate mb-2" style={{ color: "#5A6B84" }}>{r.description}</p>
                     <div className="flex items-center gap-2">
                       <StatusChip status={r.status} />
-                      <span className="text-xs" style={{ color: "#5A6B84" }}>{formatRelativeTime(r.submittedAt)}</span>
+                      <span className="text-xs" style={{ color: "#5A6B84" }}><ClientTime date={r.submittedAt} format="relative" /></span>
                     </div>
                   </div>
                 </div>
@@ -482,7 +524,7 @@ export default function CitizenApp() {
                     <div className="flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-xs font-bold" style={{ color: "#16233A" }}>{n.title}</p>
-                        <span className="text-[10px] flex-shrink-0" style={{ color: "#5A6B84" }}>{formatRelativeTime(n.createdAt)}</span>
+                        <span className="text-[10px] flex-shrink-0" style={{ color: "#5A6B84" }}><ClientTime date={n.createdAt} format="relative" /></span>
                       </div>
                       <p className="text-xs mt-0.5" style={{ color: "#5A6B84" }}>{n.body}</p>
                       {n.entityShortCode && <p className="text-[10px] mt-1 font-semibold" style={{ color: "#0E8A5F" }}>{n.entityShortCode}</p>}
@@ -778,6 +820,116 @@ export default function CitizenApp() {
           );
         })()}
 
+        {/* ══ TRACK REPORT (live report timeline) ═══════════════════════════ */}
+        {view === "track-report" && (() => {
+          const rep = liveReports.find((r) => r.id === trackReportId);
+          if (!rep) {
+            return (
+              <div className="px-4 py-6">
+                <button onClick={() => setView("my-reports")} className="flex items-center gap-1 text-xs mb-3" style={{ color: "#5A6B84" }}>
+                  <IconArrowLeft size={12} /> Back
+                </button>
+                <p className="text-sm" style={{ color: "#5A6B84" }}>This report is no longer available.</p>
+              </div>
+            );
+          }
+          const wo = workOrders.find((w) => w.citizenReportId === rep.id);
+          // Build timeline events from the report + any linked work order
+          const events = wo
+            ? wo.history
+            : [
+                { key: "reported", label: "Reported", sublabel: "You submitted", at: rep.submittedAt },
+                ...(rep.repVerified ? [{ key: "verified", label: "Verified", sublabel: "Street Rep verified", at: rep.submittedAt }] : []),
+              ];
+          return (
+            <div className="px-4 py-4">
+              <button onClick={() => setView("my-reports")} className="flex items-center gap-1 text-xs mb-3" style={{ color: "#5A6B84" }}>
+                <IconArrowLeft size={12} /> Back to My Reports
+              </button>
+
+              {/* Report header */}
+              <div className="bg-white rounded-2xl border p-4 mb-3" style={{ borderColor: "#E6E3DC", boxShadow: "0 1px 4px rgba(10,31,60,0.08)" }}>
+                <div className="flex items-start gap-3">
+                  <CategoryBadge category={rep.category} size="lg" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-sm font-bold" style={{ color: "#16233A" }}>{rep.category}</p>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "#EAF0FA", color: "#0E2A4E" }}>{rep.shortCode}</span>
+                    </div>
+                    <p className="text-xs" style={{ color: "#5A6B84" }}>{rep.description}</p>
+                    <div className="flex items-start gap-1.5 mt-2">
+                      <IconMapPin size={12} color="#0E8A5F" />
+                      <p className="text-[11px]" style={{ color: "#5A6B84" }}>{rep.address || rep.street}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Photo */}
+              {rep.photoDataUrl && (
+                <div className="rounded-2xl overflow-hidden mb-3" style={{ maxHeight: 180 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={rep.photoDataUrl} alt="Report" className="w-full object-cover" style={{ maxHeight: 180 }} />
+                </div>
+              )}
+
+              {/* Status timeline */}
+              <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#5A6B84" }}>Status Timeline</p>
+              <EventTimeline events={events} />
+
+              {/* Completed → rate & release */}
+              {wo && wo.status === "COMPLETED" && (
+                <div className="mt-3 rounded-2xl p-4 text-center" style={{ background: "#FFF8E1", border: "1px solid #C6A55C" }}>
+                  <p className="text-sm font-bold" style={{ color: "#B8860B", fontFamily: "Outfit,sans-serif" }}>Work verified by Street Rep. Please review!</p>
+                  <p className="text-xs mt-1.5" style={{ color: "#5A6B84" }}>Confirm it is resolved and rate the work to release payment.</p>
+                  <div className="flex justify-center gap-1 my-3">
+                    {[1,2,3,4,5].map((s) => (
+                      <button key={s} onClick={() => setWoRating(s)} className="text-2xl" style={{ color: s <= woRating ? "#C6A55C" : "#D9D2C4" }}>★</button>
+                    ))}
+                  </div>
+                  <button onClick={() => { resolveWorkOrder(wo.id, woRating || 5); }}
+                    className="w-full py-3.5 rounded-2xl text-sm font-bold text-white" style={{ background: "#0E8A5F", fontFamily: "Outfit,sans-serif" }}>
+                    Submit Rating &amp; Release Payment
+                  </button>
+                </div>
+              )}
+              {wo && wo.status === "RESOLVED" && (
+                <div className="mt-3 space-y-2">
+                  <div className="rounded-xl p-3 flex items-center gap-2" style={{ background: "#E7F4EF", border: "1px solid #0E8A5F" }}>
+                    <IconCheck size={16} color="#0E8A5F" />
+                    <p className="text-xs font-bold" style={{ color: "#0E8A5F" }}>Resolved · payment released{wo.rating ? ` · you rated ${wo.rating}★` : ""}</p>
+                  </div>
+                  {wo.disputeReason ? (
+                    <div className="rounded-xl p-3" style={{ background: "#FEF0EE", border: "1px solid #F3C0BA" }}>
+                      <p className="text-[11px] font-bold" style={{ color: "#C0392B" }}>You reported a problem with this work</p>
+                      <p className="text-[11px] italic mt-0.5" style={{ color: "#5A6B84" }}>&ldquo;{wo.disputeReason}&rdquo;</p>
+                    </div>
+                  ) : reopenForId === wo.id ? (
+                    <div className="rounded-xl p-3" style={{ background: "#FEF0EE", border: "1px solid #F3C0BA" }}>
+                      <p className="text-xs font-semibold mb-1.5" style={{ color: "#C0392B" }}>Report a problem with this completed work</p>
+                      <textarea value={reopenReason} onChange={(e) => setReopenReason(e.target.value)}
+                        placeholder="e.g. the pothole reappeared after two days…"
+                        className="w-full rounded-lg p-2.5 text-xs resize-none focus:outline-none bg-white"
+                        style={{ border: "1px solid #E6E3DC", color: "#16233A" }} rows={3} maxLength={400} />
+                      <div className="flex gap-2 mt-2">
+                        <button onClick={() => { disputeWorkOrder(wo.id, reopenReason || "Citizen reported a problem with the completed work"); setReopenForId(null); setReopenReason(""); }}
+                          className="flex-1 py-2 rounded-lg text-xs font-bold text-white" style={{ background: "#C0392B" }}>Submit to UC Officer</button>
+                        <button onClick={() => { setReopenForId(null); setReopenReason(""); }}
+                          className="flex-1 py-2 rounded-lg text-xs font-semibold" style={{ background: "white", color: "#5A6B84", border: "1px solid #E6E3DC" }}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => { setReopenForId(wo.id); setReopenReason(""); }}
+                      className="w-full py-2.5 rounded-xl text-xs font-semibold" style={{ background: "#FEF0EE", color: "#C0392B", border: "1px solid #F3C0BA" }}>
+                      Report a problem with this work
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ══ INCIDENT DETAIL ═══════════════════════════════════════════════ */}
         {view === "incident-detail" && selectedIncident && (
           <div className="px-4 py-4">
@@ -912,7 +1064,7 @@ export default function CitizenApp() {
 
       {/* ── Bottom Navigation ── */}
       {view !== "wizard" && (
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "white", borderTop: "1px solid #E6E3DC", height: 60, display: "flex", alignItems: "center", justifyContent: "space-around" }}>
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "white", borderTop: "1px solid #E6E3DC", height: 60, display: "flex", alignItems: "center", justifyContent: "space-around", borderBottomLeftRadius: 40, borderBottomRightRadius: 40 }}>
           {[
             { id: "home",       Icon: IconHome,      label: "Home"      },
             { id: "map",        Icon: IconMap,       label: "Map"       },

@@ -7,6 +7,14 @@ interface TimelineProps {
   status: StatusType;
   compact?: boolean;
   repVerified?: boolean;
+  /** Optional real timestamps per step key. Missing keys fall back to a synthetic time. */
+  timestamps?: Partial<Record<string, Date>>;
+  /** Base time used to synthesise step times when no timestamps provided (defaults to now). */
+  baseTime?: Date;
+}
+
+function fmtStepTime(d: Date): string {
+  return d.toLocaleString("en-PK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 const STEPS = [
@@ -66,8 +74,17 @@ function statusToDoneCount(status: StatusType, repVerified = false): number {
   }
 }
 
-export function Timeline({ status, compact = false, repVerified = false }: TimelineProps) {
+export function Timeline({ status, compact = false, repVerified = false, timestamps, baseTime }: TimelineProps) {
   const doneCount = statusToDoneCount(status, repVerified);
+  const now = baseTime ?? new Date();
+
+  // Synthesise a plausible time per step: earlier steps happened earlier.
+  // Step i (1-based) that is done/current gets (doneCount - i) hours before `now`.
+  function stepTime(stepNum: number): Date | null {
+    if (stepNum > doneCount) return null; // pending step → no time yet
+    const hoursAgo = (doneCount - stepNum) * 6; // 6h between steps by default
+    return new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
+  }
 
   return (
     <div className="bg-white rounded-2xl p-5" style={{ boxShadow: "0 1px 4px rgba(10,31,60,0.07)" }}>
@@ -77,12 +94,12 @@ export function Timeline({ status, compact = false, repVerified = false }: Timel
         const current = stepNum === doneCount;
         const pending = stepNum > doneCount;
         const isLast = idx === STEPS.length - 1;
+        const t = timestamps?.[step.key] ?? stepTime(stepNum);
 
         return (
           <div key={step.key} className="flex gap-4">
             {/* Dot + line column */}
             <div className="flex flex-col items-center">
-              {/* Dot */}
               {done || current ? (
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
@@ -97,7 +114,6 @@ export function Timeline({ status, compact = false, repVerified = false }: Timel
                 />
               )}
 
-              {/* Line */}
               {!isLast && (
                 <div
                   className="w-0.5 flex-1 mt-1 mb-1"
@@ -127,6 +143,11 @@ export function Timeline({ status, compact = false, repVerified = false }: Timel
                   style={{ fontSize: "12px", color: pending ? "#C8D0DA" : "#5A6B84" }}
                 >
                   {step.subtitle}
+                </p>
+              )}
+              {!pending && t && (
+                <p className="mt-0.5" style={{ fontSize: "11px", color: "#0E2A4E", fontWeight: 600 }}>
+                  {fmtStepTime(t)}
                 </p>
               )}
             </div>

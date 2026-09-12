@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePersistentStateAfterMount } from "@/lib/use-persistent-state";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { LiveMap } from "@/components/ui/LiveMap";
 import { CategoryBadge, IconCheck, IconMapPin, IconCamera, IconAlertTriangle } from "@/components/ui/Icons";
@@ -8,6 +9,7 @@ import {
   MOCK_INCIDENTS, MOCK_UC_STATS, MOCK_STREET_RANKINGS, MOCK_REP_PERFORMANCE,
   MOCK_DUPLICATE_REPORTS, MOCK_DUPLICATE_SIGNALS,
   LAHORE_INCIDENT_MARKERS, MOCK_CONTRACTORS,
+  MOCK_REVIEW_QUEUE, buildAiReviewNote,
 } from "@/lib/mock-data";
 import { useAppState } from "@/lib/app-state";
 
@@ -37,9 +39,9 @@ function initialsOf(name: string): string {
 }
 
 export default function DepartmentApp() {
-  const { workOrders, createWorkOrder } = useAppState();
+  const { workOrders, createWorkOrder, liveReports } = useAppState();
 
-  const [queueTab, setQueueTab] = useState<QueueTab>("review");
+  const [queueTab, setQueueTab] = usePersistentStateAfterMount<QueueTab>("cp.uco.queueTab", "review");
 
   // Work order modal
   const [woOpen, setWoOpen]   = useState(false);
@@ -49,17 +51,57 @@ export default function DepartmentApp() {
   const [toast, setToast]     = useState<string | null>(null);
   const [dismissedDisputes, setDismissedDisputes] = useState<string[]>([]);
 
-  const woIncident = MOCK_INCIDENTS.find((i) => i.id === woIncidentId);
-
   const disputes = workOrders.filter((w) => w.status === "DISPUTED" && !dismissedDisputes.includes(w.id));
   const liveCompleted = workOrders.filter((w) => w.status === "COMPLETED" || w.status === "RESOLVED");
   const liveInProgress = workOrders.filter((w) => w.status === "ASSIGNED" || w.status === "IN_PROGRESS");
 
-  const reviewIncidents = MOCK_INCIDENTS.filter((i) => ["SUBMITTED", "VERIFIED", "ASSIGNED"].includes(i.status));
+  // Live reports the Street Rep has VERIFIED and that don't yet have a work order
+  const liveVerified = liveReports.filter(
+    (r) => r.status === "VERIFIED" && !workOrders.some((w) => w.citizenReportId === r.id)
+  );
+
+  // Combined review queue: live verified reports first, then mock incidents
+  type ReviewItem = {
+    id: string;
+    isLive: boolean;
+    category: string;
+    description: string;
+    address: string;
+    shortCode: string;
+    lat?: number;
+    lng?: number;
+    citizenPhotoUrl?: string; repPhotoUrl?: string;
+    mergedCount?: number;
+    overdueHours?: number;
+    verifiedBy?: string;
+    ageHours?: number;
+    aiNote?: string | null;
+  };
+  const liveReviewItems: ReviewItem[] = liveVerified.map((r) => ({
+    id: r.id, isLive: true, category: r.category, description: r.description,
+    address: r.address || r.street, shortCode: r.shortCode,
+    lat: r.latitude, lng: r.longitude, citizenPhotoUrl: r.photoDataUrl, repPhotoUrl: r.repPhotoDataUrl,
+  }));
+  const mockReviewItems: ReviewItem[] = MOCK_INCIDENTS
+    .filter((i) => ["SUBMITTED", "VERIFIED", "ASSIGNED"].includes(i.status))
+    .map((i) => ({
+      id: i.id, isLive: false, category: i.category, description: i.description,
+      address: i.location, shortCode: i.shortCode, lat: i.lat, lng: i.lng,
+    }));
+  const queueReviewItems: ReviewItem[] = MOCK_REVIEW_QUEUE.map((q) => ({
+    id: q.id, isLive: false, category: q.category, description: `${q.category} reported on ${q.street}`,
+    address: q.street, shortCode: q.shortCode, lat: q.lat, lng: q.lng,
+    mergedCount: q.mergedCount, overdueHours: q.overdueHours, verifiedBy: q.verifiedBy,
+    ageHours: q.ageHours, aiNote: buildAiReviewNote(q),
+  }));
+  const reviewItems: ReviewItem[] = [...liveReviewItems, ...queueReviewItems, ...mockReviewItems];
   const inProcessIncidents = MOCK_INCIDENTS.filter((i) =>
     ["IN_PROGRESS", "RESOLUTION_SUBMITTED", "AWAITING_CITIZEN_VERIFICATION", "REOPENED"].includes(i.status)
   );
   const waitingIncidents = MOCK_INCIDENTS.filter((i) => i.status === "ASSIGNED");
+
+  // The item currently open in the work-order modal (live report or mock incident)
+  const woItem = reviewItems.find((r) => r.id === woIncidentId);
 
   function openWorkOrderModal(incidentId: string) {
     setWoIncidentId(incidentId);
@@ -69,16 +111,19 @@ export default function DepartmentApp() {
   }
 
   function submitWorkOrder() {
-    if (!woIncident) return;
+    if (!woItem) return;
     createWorkOrder({
-      shortCode: `CP-${woIncident.shortCode}`,
-      category: woIncident.category,
-      description: woIncident.description,
-      address: woIncident.location,
-      latitude: woIncident.lat,
-      longitude: woIncident.lng,
+      shortCode: `CP-${woItem.shortCode}`,
+      category: woItem.category,
+      description: woItem.description,
+      address: woItem.address,
+      latitude: woItem.lat,
+      longitude: woItem.lng,
       contractor: woContractor,
       cost: woCost ? Number(woCost) : undefined,
+      citizenPhotoUrl: woItem.citizenPhotoUrl,
+      repPhotoUrl: woItem.repPhotoUrl,
+      citizenReportId: woItem.isLive ? woItem.id : undefined,
     });
     setWoOpen(false);
     setToast(`Work order generated and assigned to ${woContractor}`);
@@ -153,7 +198,7 @@ export default function DepartmentApp() {
 
   // ──────────────────────────────────────────────────────────────────────────
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: "#F5F3EF", boxShadow: "0 4px 24px rgba(10,31,60,0.15)", minHeight: "680px", position: "relative" }}>
+    <div className="rounded-2xl overflow-hidden" style={{ background: "#F5F3EF", boxShadow: "0 4px 24px rgba(10,31,60,0.15)", minHeight: "calc(100vh - 150px)", position: "relative" }}>
 
       {/* ── Toast ── */}
       {toast && (
@@ -163,7 +208,7 @@ export default function DepartmentApp() {
         </div>
       )}
 
-      <div className="overflow-y-auto p-5 space-y-5" style={{ maxHeight: "720px" }}>
+      <div className="overflow-y-auto p-5 space-y-5" style={{ maxHeight: "calc(100vh - 170px)" }}>
 
         {/* ── 1. Header row (white) ── */}
         <div className="rounded-2xl px-5 py-4 flex items-center justify-between" style={{ ...CARD }}>
@@ -238,40 +283,49 @@ export default function DepartmentApp() {
             {/* Needs Review */}
             {queueTab === "review" && (
               <div className="space-y-3" style={{ maxHeight: "380px", overflowY: "auto" }}>
-                {reviewIncidents.map((inc, idx) => {
-                  // deterministic merged count per item (0 = not merged)
-                  const mergedCount = idx === 0 ? 6 : idx === 1 ? 5 : idx === 2 ? 3 : 0;
+                {reviewItems.map((item, idx) => {
+                  const mergedCount = item.mergedCount ?? (item.isLive ? 0 : (idx === 0 ? 6 : idx === 1 ? 5 : idx === 2 ? 3 : 0));
+                  const streetLabel = item.address || "Street 14";
+                  const verifier = item.verifiedBy || "Ahmed Raza";
+                  const ageLabel = item.isLive ? "just now" : item.ageHours != null ? `${item.ageHours} hrs old` : `${2 + idx * 3} hrs old`;
+                  const aiNote = item.aiNote !== undefined
+                    ? item.aiNote
+                    : mergedCount > 0
+                    ? `AI Merge: ${mergedCount} similar reports were identified at this location. Root cause appears to be structural.`
+                    : null;
+                  const isProximity = !!aiNote && aiNote.includes("Proximity alert");
                   return (
-                    <div key={inc.id} className="rounded-xl overflow-hidden" style={{ background: "#F8F7F4", border: "1px solid #EFEBE3" }}>
+                    <div key={item.id} className="rounded-xl overflow-hidden" style={{ background: "#F8F7F4", border: `1px solid ${item.isLive ? "#0E8A5F" : isProximity ? "#F3C0BA" : "#EFEBE3"}` }}>
                       <div className="flex items-center gap-3 p-3">
-                        <CategoryBadge category={inc.category} size="md" />
+                        <CategoryBadge category={item.category} size="md" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                            <p className="text-xs font-bold" style={{ color: "#16233A" }}>{inc.category} · Street 14</p>
-                            {idx === 0 && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#FFF3E0", color: "#B8860B" }}>Overdue 2 hrs</span>
+                            <p className="text-xs font-bold truncate" style={{ color: "#16233A" }}>{item.category} · {streetLabel}</p>
+                            {item.isLive && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#E7F4EF", color: "#0E8A5F" }}>New · Rep verified</span>
+                            )}
+                            {item.overdueHours != null && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#FEE2DE", color: "#C0392B" }}>Overdue {item.overdueHours} hrs</span>
                             )}
                             {mergedCount > 0 && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#EAF0FA", color: "#0E2A4E" }}>#{mergedCount} merged</span>
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#FFF3E0", color: "#B8860B" }}>×{mergedCount} merged</span>
                             )}
                           </div>
-                          <p className="text-[11px]" style={{ color: "#5A6B84" }}>{inc.shortCode} · verified by Ahmed Raza · {2 + idx * 3} hrs old</p>
+                          <p className="text-[11px]" style={{ color: "#5A6B84" }}>{item.shortCode} · verified by {verifier} · {ageLabel}</p>
                         </div>
-                        <button onClick={() => openWorkOrderModal(inc.id)}
+                        <button onClick={() => openWorkOrderModal(item.id)}
                           className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white whitespace-nowrap" style={{ background: "#0E8A5F" }}>Review</button>
                       </div>
-                      {mergedCount > 0 && (
+                      {aiNote && (
                         <div className="px-3 py-2 flex items-start gap-1.5" style={{ background: "#EAF0FA", borderTop: "1px solid #DCE6F5" }}>
-                          <IconAlertTriangle size={12} color="#0E2A4E" />
-                          <p className="text-[10px]" style={{ color: "#0E2A4E" }}>
-                            <span className="font-bold">AI Merge:</span> {mergedCount} similar reports were identified at this location. Root cause appears to be structural.
-                          </p>
+                          <IconAlertTriangle size={12} color={isProximity ? "#C0392B" : "#0E2A4E"} />
+                          <p className="text-[10px]" style={{ color: isProximity ? "#C0392B" : "#0E2A4E" }}>{aiNote}</p>
                         </div>
                       )}
                     </div>
                   );
                 })}
-                {reviewIncidents.length === 0 && (
+                {reviewItems.length === 0 && (
                   <p className="text-center text-xs py-6" style={{ color: "#5A6B84" }}>Nothing to review</p>
                 )}
               </div>
@@ -437,7 +491,7 @@ export default function DepartmentApp() {
       </div>
 
       {/* ══ WORK ORDER MODAL ══ */}
-      {woOpen && woIncident && (
+      {woOpen && woItem && (
         <div className="absolute inset-0 z-50 flex items-center justify-center p-6" style={{ background: "rgba(10,31,60,0.45)" }}>
           <div className="w-full max-w-lg rounded-2xl overflow-hidden" style={{ background: "#FFFFFF", maxHeight: "90%", overflowY: "auto" }}>
             <div className="px-5 py-4 flex items-center justify-between" style={{ background: "#0A1F3C" }}>
@@ -446,18 +500,18 @@ export default function DepartmentApp() {
             </div>
             <div className="p-5 space-y-4">
               <div className="flex items-center gap-3">
-                <CategoryBadge category={woIncident.category} size="lg" />
+                <CategoryBadge category={woItem.category} size="lg" />
                 <div>
-                  <p className="text-base font-bold" style={{ color: "#16233A", fontFamily: "Outfit,sans-serif" }}>{woIncident.category}</p>
-                  <p className="text-[11px] font-mono" style={{ color: "#5A6B84" }}>{woIncident.shortCode}</p>
+                  <p className="text-base font-bold" style={{ color: "#16233A", fontFamily: "Outfit,sans-serif" }}>{woItem.category}</p>
+                  <p className="text-[11px] font-mono" style={{ color: "#5A6B84" }}>{woItem.shortCode}</p>
                 </div>
               </div>
               <div className="rounded-xl p-3" style={{ background: "#F8F7F4" }}>
                 <div className="flex items-start gap-1.5">
                   <IconMapPin size={14} color="#0E8A5F" />
                   <div>
-                    <p className="text-xs font-semibold" style={{ color: "#16233A" }}>{woIncident.location}</p>
-                    <p className="text-[11px] font-mono mt-0.5" style={{ color: "#5A6B84" }}>{woIncident.lat.toFixed(5)}, {woIncident.lng.toFixed(5)}</p>
+                    <p className="text-xs font-semibold" style={{ color: "#16233A" }}>{woItem.address}</p>
+                    <p className="text-[11px] font-mono mt-0.5" style={{ color: "#5A6B84" }}>{woItem.lat != null ? woItem.lat.toFixed(5) : "—"}, {woItem.lng != null ? woItem.lng.toFixed(5) : "—"}</p>
                   </div>
                 </div>
               </div>
@@ -466,14 +520,24 @@ export default function DepartmentApp() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: "#5A6B84" }}>Citizen Photo (Before)</p>
-                  <div className="rounded-xl h-28 flex items-center justify-center" style={{ background: "#0A1F3C" }}>
-                    <CategoryBadge category={woIncident.category} size="lg" />
+                  <div className="rounded-xl h-28 flex items-center justify-center overflow-hidden" style={{ background: "#0A1F3C" }}>
+                    {woItem.citizenPhotoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={woItem.citizenPhotoUrl} alt="Citizen report" className="w-full h-full object-cover" />
+                    ) : (
+                      <CategoryBadge category={woItem.category} size="lg" />
+                    )}
                   </div>
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: "#5A6B84" }}>Street Rep Verification</p>
-                  <div className="rounded-xl h-28 flex items-center justify-center" style={{ background: "#E7F4EF", border: "1px solid #0E8A5F" }}>
-                    <IconCheck size={30} color="#0E8A5F" />
+                  <div className="rounded-xl h-28 flex items-center justify-center overflow-hidden" style={{ background: "#E7F4EF", border: "1px solid #0E8A5F" }}>
+                    {woItem.repPhotoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={woItem.repPhotoUrl} alt="Rep verification" className="w-full h-full object-cover" />
+                    ) : (
+                      <IconCheck size={30} color="#0E8A5F" />
+                    )}
                   </div>
                 </div>
               </div>

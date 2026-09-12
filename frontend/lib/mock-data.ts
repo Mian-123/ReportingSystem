@@ -605,6 +605,60 @@ export function nearbyPOIs(lat: number, lng: number, radius = 500): { poi: MockP
     .sort((a, b) => a.distance - b.distance);
 }
 
+// ═══════════════════════════════════════
+// UC Officer ─ Needs Review queue (rich mock data + AI proximity note)
+// ═══════════════════════════════════════
+
+export interface MockReviewItem {
+  id: string;
+  shortCode: string;
+  category: string;
+  street: string;
+  verifiedBy: string;
+  ageHours: number;          // how long since verified
+  mergedCount: number;       // duplicate reports auto-merged (0 = none)
+  overdueHours?: number;     // if set, shows an "Overdue N hrs" badge
+  lat?: number;
+  lng?: number;
+  priorityBumped?: "HIGH" | "CRITICAL";  // AI explicitly raised priority
+}
+
+// Ordered to mirror the operations screenshots (Garbage, Streetlight, Roads x5,
+// Roads, Roads x6, Waste x4, plus the hospital-proximity HIGH garbage pile).
+export const MOCK_REVIEW_QUEUE: MockReviewItem[] = [
+  { id: "rq-1", shortCode: "LHR-5D946", category: "Garbage / Waste", street: "Street 14", verifiedBy: "Ahmed Raza", ageHours: 0,  mergedCount: 0 },
+  { id: "rq-2", shortCode: "LHR-D3",    category: "Streetlight",     street: "Street 14", verifiedBy: "Ahmed Raza", ageHours: 24, mergedCount: 0 },
+  { id: "rq-3", shortCode: "LHR-INC-1", category: "Broken Road",     street: "Street 14", verifiedBy: "Ahmed Raza", ageHours: 21, mergedCount: 5, overdueHours: 21, lat: 31.5134, lng: 74.3461 },
+  { id: "rq-4", shortCode: "LHR-INC-1", category: "Broken Road",     street: "Street 14", verifiedBy: "Ahmed Raza", ageHours: 25, mergedCount: 0 },
+  { id: "rq-5", shortCode: "LHR-INC-9", category: "Broken Road",     street: "Street 14", verifiedBy: "Ahmed Raza", ageHours: 29, mergedCount: 6, overdueHours: 29, lat: 31.5260, lng: 74.3650 },
+  { id: "rq-6", shortCode: "LHR-INC-6", category: "Waste Management",street: "Street 14", verifiedBy: "Ahmed Raza", ageHours: 32, mergedCount: 4 },
+  { id: "rq-7", shortCode: "LHR-CA9C0", category: "Garbage / Waste", street: "Street 14", verifiedBy: "Ahmed Raza", ageHours: 33, mergedCount: 10, overdueHours: 33, priorityBumped: "HIGH", lat: 31.5150, lng: 74.3460 },
+];
+
+// Builds the UC Officer AI review note. When the report sits within 500m of a
+// hospital/school it flags a proximity alert and an explicit priority bump,
+// then appends the auto-merge count — mirroring the priority-scorer output.
+export function buildAiReviewNote(item: MockReviewItem): string | null {
+  const parts: string[] = [];
+  const nearby = item.lat != null && item.lng != null ? nearbyPOIs(item.lat, item.lng, 500) : [];
+  const sensitive = nearby.find((n) => n.poi.type === "hospital" || n.poi.type === "school");
+  const place = item.category.toLowerCase().includes("garbage") || item.category.toLowerCase().includes("waste")
+    ? "garbage pile"
+    : item.category.toLowerCase().includes("road")
+    ? "road hazard"
+    : "issue";
+  if (sensitive) {
+    const band = item.priorityBumped ?? "HIGH";
+    parts.push(`🚨 Priority explicitly bumped to ${band}. Proximity alert: A ${sensitive.poi.type} is within 500m of this ${place}!`);
+    if (item.mergedCount > 0) parts.push(`${item.mergedCount} reports have been automatically merged.`);
+    return parts.join(" ");
+  }
+  if (item.mergedCount > 0) {
+    return `AI Merge: ${item.mergedCount} similar reports were identified at this location. Root cause appears to be structural.`;
+  }
+  return null;
+}
+
 // ── Category metadata for the report wizard (icon + Urdu label) ──────────────
 export interface CategoryMeta {
   name: string;

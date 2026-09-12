@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { usePersistentStateAfterMount } from "@/lib/use-persistent-state";
 import { type Role } from "@/lib/utils";
 import CitizenApp from "./roles/CitizenApp";
 import StreetRepApp from "./roles/StreetRepApp";
@@ -61,7 +61,7 @@ function PhoneFrame({ children }: { children: React.ReactNode }) {
 }
 
 export default function PrototypeShell() {
-  const [activeRole, setActiveRole] = useState<Role>("citizen");
+  const [activeRole, setActiveRole] = usePersistentStateAfterMount<Role>("cp.activeRole", "citizen");
   const isMobile = activeRole === "citizen" || activeRole === "street-rep" || activeRole === "contractor";
 
   return (

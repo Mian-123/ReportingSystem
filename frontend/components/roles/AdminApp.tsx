@@ -7,7 +7,7 @@ import { KPICard } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { CategoryBadge } from "@/components/ui/Icons";
 import { MOCK_INCIDENTS, MOCK_MINISTRY_STATS } from "@/lib/mock-data";
-import { formatDateTime } from "@/lib/utils";
+import { ClientTime } from "@/components/ui/ClientTime";
 
 const NAV_ITEMS = [
   { id: "users", label: "Users", icon: "👥" },
@@ -547,7 +547,7 @@ export default function AdminApp() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-xs font-bold text-[#16233A]">{entry.event.replace(/_/g, " ")}</p>
-                        <span className="text-[10px] text-[#5A6B84] flex-shrink-0">{formatDateTime(entry.ts)}</span>
+                        <span className="text-[10px] text-[#5A6B84] flex-shrink-0"><ClientTime date={entry.ts} format="datetime" /></span>
                       </div>
                       <p className="text-[11px] text-[#5A6B84] mt-0.5">{entry.summary}</p>
                       <div className="flex gap-2 mt-1">

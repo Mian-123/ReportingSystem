@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useCallback } from "react";
+import { usePersistentStateAfterMount } from "@/lib/use-persistent-state";
 
 // ── Report (citizen → street rep) ─────────────────────────────────────────────
 
@@ -84,6 +85,9 @@ interface AppState {
     repPhotoUrl?: string;
     contractor: string;
     cost?: number;
+    citizenReportId?: string;
+    reportedAt?: Date;
+    verifiedAt?: Date;
   }) => string;
   startWork: (id: string) => void;
   completeWork: (id: string, contractorPhotoUrl?: string) => void;
@@ -98,8 +102,8 @@ function ev(key: string, label: string, sublabel: string): TimelineEvent {
 }
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
-  const [liveReports, setLiveReports] = useState<LiveReport[]>([]);
-  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [liveReports, setLiveReports] = usePersistentStateAfterMount<LiveReport[]>("cp.liveReports", []);
+  const [workOrders, setWorkOrders] = usePersistentStateAfterMount<WorkOrder[]>("cp.workOrders", []);
 
   // ── Reports ────────────────────────────────────────────────────────────────
 
