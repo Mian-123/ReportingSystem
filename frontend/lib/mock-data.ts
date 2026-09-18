@@ -17,6 +17,15 @@ export const LAHORE_INCIDENT_MARKERS = [
   { id: "inc-013", lng: 74.3900, lat: 31.5220, color: "#C0392B", label: "INC-LHR-013", category: "Flooding / Standing Water", address: "Mughalpura",        status: "AWAITING_CITIZEN_VERIFICATION", priority: "Critical", firstReported: "Aug 20, 11:20 PM", lastReported: "Aug 22, 06:10 AM", citizenReports: 8, department: "WASA" },
   { id: "inc-014", lng: 74.3250, lat: 31.5300, color: "#E0A400", label: "INC-LHR-014", category: "Infrastructure",            address: "Sanda",             status: "ASSIGNED",                      priority: "Medium",   firstReported: "Aug 21, 10:05 AM", lastReported: "Aug 22, 09:00 AM", citizenReports: 3, department: "LDA Roads" },
   { id: "inc-015", lng: 74.3700, lat: 31.5150, color: "#C6A55C", label: "INC-LHR-015", category: "Sewerage / Water",          address: "Muslim Town",       status: "IN_PROGRESS",                   priority: "High",     firstReported: "Aug 20, 04:50 PM", lastReported: "Aug 22, 11:30 AM", citizenReports: 5, department: "WASA" },
+  { id: "inc-016", lng: 74.3410, lat: 31.5240, color: "#C0392B", label: "INC-LHR-016", category: "Sewerage / Water", address: "Liberty Market", status: "SUBMITTED", priority: "Critical", firstReported: "Aug 18, 07:05 AM", lastReported: "Aug 22, 03:20 PM", citizenReports: 11, department: "WASA" },
+  { id: "inc-017", lng: 74.3840, lat: 31.5350, color: "#E0A400", label: "INC-LHR-017", category: "Garbage / Waste", address: "Wapda Town", status: "ASSIGNED", priority: "Medium", firstReported: "Aug 19, 08:30 AM", lastReported: "Aug 21, 05:15 PM", citizenReports: 4, department: "LWMC" },
+  { id: "inc-018", lng: 74.3180, lat: 31.5020, color: "#0E8A5F", label: "INC-LHR-018", category: "Streetlight", address: "Township", status: "RESOLVED", priority: "Low", firstReported: "Aug 08, 09:10 PM", lastReported: "Aug 08, 09:10 PM", citizenReports: 1, department: "LESCO" },
+  { id: "inc-019", lng: 74.3960, lat: 31.5090, color: "#C6A55C", label: "INC-LHR-019", category: "Broken Road", address: "Baghbanpura", status: "IN_PROGRESS", priority: "High", firstReported: "Aug 17, 02:40 PM", lastReported: "Aug 22, 10:25 AM", citizenReports: 8, department: "LDA Roads" },
+  { id: "inc-020", lng: 74.3120, lat: 31.5410, color: "#C0392B", label: "INC-LHR-020", category: "Flooding / Standing Water", address: "Ravi Road", status: "REOPENED", priority: "Critical", firstReported: "Aug 13, 06:00 AM", lastReported: "Aug 22, 07:45 AM", citizenReports: 13, department: "WASA" },
+  { id: "inc-021", lng: 74.3550, lat: 31.4980, color: "#E0A400", label: "INC-LHR-021", category: "Encroachment", address: "Mozang", status: "SUBMITTED", priority: "Medium", firstReported: "Aug 22, 11:50 AM", lastReported: "Aug 22, 11:50 AM", citizenReports: 2, department: "LMC" },
+  { id: "inc-022", lng: 74.3880, lat: 31.5450, color: "#0E8A5F", label: "INC-LHR-022", category: "Drainage", address: "Harbanspura", status: "RESOLVED", priority: "Low", firstReported: "Aug 07, 04:30 PM", lastReported: "Aug 07, 04:30 PM", citizenReports: 2, department: "WASA" },
+  { id: "inc-023", lng: 74.3300, lat: 31.5460, color: "#C6A55C", label: "INC-LHR-023", category: "Streetlight", address: "Shahdara", status: "IN_PROGRESS", priority: "High", firstReported: "Aug 16, 08:20 PM", lastReported: "Aug 21, 09:40 PM", citizenReports: 5, department: "LESCO" },
+  { id: "inc-024", lng: 74.3440, lat: 31.5000, color: "#C0392B", label: "INC-LHR-024", category: "Safety Hazard", address: "Chauburji", status: "IN_PROGRESS", priority: "Critical", firstReported: "Aug 21, 06:15 PM", lastReported: "Aug 22, 09:30 AM", citizenReports: 7, department: "LMC" },
 ];
 
 export interface MockReport {
@@ -685,3 +694,20 @@ export const MOCK_CONTRACTORS_EXTRA: MockContractor[] = [
   { id: "con-005", name: "Bilal & Sons",      specialty: "Drainage & Sewerage",   rating: 4.5, completedJobs: 133, pendingJobs: 4, avatarInitials: "BS" },
   { id: "con-006", name: "Ravi Constructors", specialty: "Roads & Paving",        rating: 4.2, completedJobs: 87,  pendingJobs: 6, avatarInitials: "RC" },
 ];
+
+
+// Convert live citizen reports (with a picked/geolocated position) into map markers.
+interface LiveReportLike { id: string; shortCode: string; category: string; description?: string; street?: string; address?: string; latitude?: number; longitude?: number; submittedAt: Date | string; status: string; photoDataUrl?: string; }
+export function liveReportsToMarkers(reports: LiveReportLike[]) {
+  const fmt = (d: Date | string) => new Date(d).toLocaleString("en-US", { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const statusColor: Record<string, string> = { SUBMITTED: "#5A6B84", VERIFIED: "#2563EB", REJECTED: "#C0392B" };
+  return reports
+    .filter((r) => typeof r.latitude === "number" && typeof r.longitude === "number")
+    .map((r) => ({
+      id: r.id, lng: r.longitude as number, lat: r.latitude as number,
+      color: statusColor[r.status] || "#2563EB", label: r.shortCode, category: r.category,
+      address: r.address || r.street, status: r.status,
+      firstReported: fmt(r.submittedAt), lastReported: fmt(r.submittedAt),
+      citizenReports: 1, photoDataUrl: r.photoDataUrl, isLive: true,
+    }));
+}

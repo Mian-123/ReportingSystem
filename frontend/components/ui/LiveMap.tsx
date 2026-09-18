@@ -17,6 +17,8 @@ export interface MapMarker {
   lastReported?: string;
   citizenReports?: number;
   department?: string;
+  photoDataUrl?: string;
+  isLive?: boolean;
 }
 
 interface LiveMapProps {
@@ -126,6 +128,10 @@ function buildPopupHTML(m: MapMarker): string {
 
   // Divider
   parts.push(`<div style="height:1px;background:#E6E3DC;margin:8px 0"></div>`);
+
+  if (m.photoDataUrl) {
+    parts.push(`<div style="margin:2px 0 8px;border-radius:10px;overflow:hidden;border:1px solid #E6E3DC"><img src="${m.photoDataUrl}" alt="report" style="width:100%;height:110px;object-fit:cover;display:block"/></div>`);
+  }
 
   // Detail rows
   if (m.address)        parts.push(row("Location", m.address));

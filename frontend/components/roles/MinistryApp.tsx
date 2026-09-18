@@ -6,7 +6,7 @@ import { formatDateTime } from "@/lib/utils";
 import { LiveMap } from "@/components/ui/LiveMap";
 import { CategoryBadge } from "@/components/ui/Icons";
 import {
-  LAHORE_INCIDENT_MARKERS,
+  LAHORE_INCIDENT_MARKERS, liveReportsToMarkers,
   MOCK_CITY_KPIS,
   MOCK_DISTRICT_LEAGUE,
   MOCK_URGENT_STREETS,
@@ -87,7 +87,7 @@ const LEGEND_TYPE = [
 export default function MinistryApp() {
   const [datePreset] = useState("30d");
   void datePreset;
-  const { announcements, addAnnouncement, deleteAnnouncement } = useAppState();
+  const { announcements, addAnnouncement, deleteAnnouncement, liveReports } = useAppState();
   const [composerOpen, setComposerOpen] = useState(false);
   const [annTitle, setAnnTitle] = useState("");
   const [annBody, setAnnBody] = useState("");
@@ -251,7 +251,7 @@ export default function MinistryApp() {
               </SectionLabel>
               <LiveMap
                 height="360px"
-                markers={LAHORE_INCIDENT_MARKERS}
+                markers={[...LAHORE_INCIDENT_MARKERS, ...liveReportsToMarkers(liveReports)]}
                 zoom={11}
                 className="rounded-xl"
               />

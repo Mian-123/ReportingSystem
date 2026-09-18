@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/Icons";
 import {
   MOCK_CITIZEN_REPORTS, MOCK_INCIDENTS, MOCK_NOTIFICATIONS,
-  MOCK_ANNOUNCEMENTS, LAHORE_INCIDENT_MARKERS, CATEGORY_META, nearbyPOIs,
+  MOCK_ANNOUNCEMENTS, LAHORE_INCIDENT_MARKERS, CATEGORY_META, nearbyPOIs, liveReportsToMarkers,
 } from "@/lib/mock-data";
 import { useAppState } from "@/lib/app-state";
 import { ClientTime } from "@/components/ui/ClientTime";
@@ -277,7 +277,7 @@ export default function CitizenApp() {
         {view === "map" && (
           <div className="px-4 py-4">
             <p className="text-base font-bold mb-3" style={{ color: "#16233A", fontFamily: "Outfit,sans-serif" }}>Lahore Incident Map</p>
-            <LiveMap height="320px" markers={LAHORE_INCIDENT_MARKERS} zoom={12} className="mb-3" />
+            <LiveMap height="320px" markers={[...LAHORE_INCIDENT_MARKERS, ...liveReportsToMarkers(liveReports)]} zoom={12} className="mb-3" />
             <div className="flex gap-4 mb-3 flex-wrap">
               {[{l:"Critical",c:"#C0392B"},{l:"High",c:"#C6A55C"},{l:"Medium",c:"#E0A400"},{l:"Resolved",c:"#0E8A5F"}].map((l)=>(
                 <div key={l.l} className="flex items-center gap-1.5">

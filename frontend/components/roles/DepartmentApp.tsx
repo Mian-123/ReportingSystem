@@ -8,7 +8,7 @@ import { CategoryBadge, IconCheck, IconMapPin, IconCamera, IconAlertTriangle } f
 import {
   MOCK_INCIDENTS, MOCK_UC_STATS, MOCK_STREET_RANKINGS, MOCK_REP_PERFORMANCE,
   MOCK_DUPLICATE_REPORTS, MOCK_DUPLICATE_SIGNALS,
-  LAHORE_INCIDENT_MARKERS, MOCK_CONTRACTORS,
+  LAHORE_INCIDENT_MARKERS, MOCK_CONTRACTORS, liveReportsToMarkers,
   MOCK_REVIEW_QUEUE, buildAiReviewNote,
 } from "@/lib/mock-data";
 import { useAppState } from "@/lib/app-state";
@@ -256,7 +256,7 @@ export default function DepartmentApp() {
           {/* LEFT — Live map */}
           <div className="rounded-xl p-4" style={{ ...CARD }}>
             <p className="text-sm font-bold mb-3" style={{ color: "#16233A", fontFamily: "Outfit,sans-serif" }}>Live street map · UC-14</p>
-            <LiveMap height="380px" markers={LAHORE_INCIDENT_MARKERS} zoom={12} className="rounded-xl" />
+            <LiveMap height="380px" markers={[...LAHORE_INCIDENT_MARKERS, ...liveReportsToMarkers(liveReports)]} zoom={12} className="rounded-xl" />
             <div className="flex flex-wrap gap-4 mt-3">
               {[{l:"Good",c:"#0E8A5F"},{l:"Needs work",c:"#E0A400"},{l:"Urgent",c:"#C0392B"}].map((leg)=>(
                 <div key={leg.l} className="flex items-center gap-1.5">
