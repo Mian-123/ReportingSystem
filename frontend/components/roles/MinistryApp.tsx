@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useAppState, type AnnouncementAudience } from "@/lib/app-state";
+import { formatDateTime } from "@/lib/utils";
 import { LiveMap } from "@/components/ui/LiveMap";
 import { CategoryBadge } from "@/components/ui/Icons";
 import {
@@ -83,8 +85,25 @@ const LEGEND_TYPE = [
 ];
 
 export default function MinistryApp() {
-  const [datePreset] = useState("30d");
-  void datePreset;
+  const [datePreset] = useState("30d");
+  void datePreset;
+  const { announcements, addAnnouncement, deleteAnnouncement } = useAppState();
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [annTitle, setAnnTitle] = useState("");
+  const [annBody, setAnnBody] = useState("");
+  const [annAudience, setAnnAudience] = useState<AnnouncementAudience>("all");
+  const AUDIENCES: { id: AnnouncementAudience; label: string }[] = [
+    { id: "citizen", label: "Citizens" },
+    { id: "street-rep", label: "Street Reps" },
+    { id: "department", label: "UC Officers" },
+    { id: "all", label: "Everyone" },
+  ];
+  function broadcast() {
+    if (!annTitle.trim() && !annBody.trim()) return;
+    addAnnouncement({ title: annTitle.trim() || "Announcement", body: annBody.trim(), audience: annAudience });
+    setAnnTitle(""); setAnnBody(""); setAnnAudience("all"); setComposerOpen(false);
+  }
+  const audienceLabel = (a: AnnouncementAudience) => a === "all" ? "Everyone" : a === "citizen" ? "Citizens" : a === "street-rep" ? "Street Reps" : "UC Officers";
 
   const kpis = MOCK_CITY_KPIS;
   const stats = MOCK_MINISTRY_STATS;
@@ -114,8 +133,9 @@ export default function MinistryApp() {
             <button
               className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
               style={{ background: GOLD }}
+              onClick={() => setComposerOpen((v) => !v)}
             >
-              Announce
+              {composerOpen ? "Close" : "Announce"}
             </button>
             <button
               className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
@@ -126,6 +146,56 @@ export default function MinistryApp() {
           </div>
         </div>
 
+        {/* ══════════════ ANNOUNCEMENTS ══════════════ */}
+        {composerOpen && (
+          <Card>
+            <SectionLabel>Broadcast an announcement</SectionLabel>
+            <input value={annTitle} onChange={(e) => setAnnTitle(e.target.value)} placeholder="Title (e.g. Water supply notice)"
+              className="w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none mb-2" style={{ border: `1px solid ${BORDER}`, color: HEADING }} />
+            <textarea value={annBody} onChange={(e) => setAnnBody(e.target.value)} placeholder="Write your message…" rows={3}
+              className="w-full rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none mb-3" style={{ border: `1px solid ${BORDER}`, color: HEADING }} />
+            <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: MUTED }}>Send to</p>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {AUDIENCES.map((a) => {
+                const active = annAudience === a.id;
+                return (
+                  <button key={a.id} onClick={() => setAnnAudience(a.id)}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+                    style={{ background: active ? GREEN : "#FFFFFF", color: active ? "#fff" : MUTED, border: `1px solid ${active ? GREEN : BORDER}` }}>
+                    {a.label}
+                  </button>
+                );
+              })}
+            </div>
+            <button onClick={broadcast}
+              className="px-4 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: GREEN }}>
+              Broadcast to {audienceLabel(annAudience)}
+            </button>
+          </Card>
+        )}
+
+        {announcements.length > 0 && (
+          <Card>
+            <SectionLabel>Sent announcements</SectionLabel>
+            <div className="space-y-2">
+              {announcements.map((a) => (
+                <div key={a.id} className="flex items-start justify-between gap-3 rounded-xl p-3" style={{ background: PAGE_BG, border: `1px solid ${BORDER}` }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-bold" style={{ color: HEADING }}>{a.title}</p>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "#EAF0FA", color: BLUE }}>{audienceLabel(a.audience)}</span>
+                    </div>
+                    <p className="text-xs mt-0.5" style={{ color: MUTED }}>{a.body}</p>
+                    <p className="text-[10px] mt-1" style={{ color: MUTED }}>{formatDateTime(a.createdAt)}</p>
+                  </div>
+                  <button onClick={() => deleteAnnouncement(a.id)}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-semibold flex-shrink-0" style={{ background: "#FEF0EE", color: RED }}>Delete</button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
         {/* ══════════════ KPI ROW ══════════════ */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>

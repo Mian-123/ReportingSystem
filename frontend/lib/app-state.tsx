@@ -64,6 +64,16 @@ export interface WorkOrder {
   history: TimelineEvent[];     // timestamped lifecycle
 }
 
+export type AnnouncementAudience = "citizen" | "street-rep" | "department" | "all";
+
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  audience: AnnouncementAudience;
+  createdAt: Date;
+}
+
 interface AppState {
   // reports
   liveReports: LiveReport[];
@@ -93,6 +103,11 @@ interface AppState {
   completeWork: (id: string, contractorPhotoUrl?: string) => void;
   resolveWorkOrder: (id: string, rating: number) => void;
   disputeWorkOrder: (id: string, reason: string) => void;
+
+  // announcements (Mayor / Ops broadcast)
+  announcements: Announcement[];
+  addAnnouncement: (a: { title: string; body: string; audience: AnnouncementAudience }) => void;
+  deleteAnnouncement: (id: string) => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -104,6 +119,18 @@ function ev(key: string, label: string, sublabel: string): TimelineEvent {
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [liveReports, setLiveReports] = usePersistentStateAfterMount<LiveReport[]>("cp.liveReports", []);
   const [workOrders, setWorkOrders] = usePersistentStateAfterMount<WorkOrder[]>("cp.workOrders", []);
+  const [announcements, setAnnouncements] = usePersistentStateAfterMount<Announcement[]>("cp.announcements", []);
+
+  const addAnnouncement = useCallback((a: { title: string; body: string; audience: AnnouncementAudience }) => {
+    setAnnouncements((prev) => [
+      { id: `ann-${Date.now()}`, title: a.title, body: a.body, audience: a.audience, createdAt: new Date() },
+      ...prev,
+    ]);
+  }, [setAnnouncements]);
+
+  const deleteAnnouncement = useCallback((id: string) => {
+    setAnnouncements((prev) => prev.filter((x) => x.id !== id));
+  }, [setAnnouncements]);
 
   // ── Reports ────────────────────────────────────────────────────────────────
 
@@ -229,6 +256,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       value={{
         liveReports, addReport, verifyReport, rejectReport, deleteReport,
         workOrders, createWorkOrder, startWork, completeWork, resolveWorkOrder, disputeWorkOrder,
+        announcements, addAnnouncement, deleteAnnouncement,
       }}
     >
       {children}

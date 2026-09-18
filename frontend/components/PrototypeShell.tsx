@@ -24,7 +24,7 @@ function PhoneFrame({ children }: { children: React.ReactNode }) {
     <div
       className="relative mx-auto select-none"
       style={{
-        width: 390,
+        width: "min(390px, calc(100vw - 16px))",
         /* phone body */
         background: "#16233A",
         borderRadius: 50,
@@ -68,7 +68,7 @@ export default function PrototypeShell() {
     <div className="min-h-screen flex flex-col" style={{ background: "#081426" }}>
 
       {/* ── Top bar ── */}
-      <div className="sticky top-0 z-50 border-b border-[#12345E] px-4 py-3 flex items-center justify-between flex-wrap gap-3"
+      <div className="sticky top-0 z-50 border-b border-[#12345E] px-3 sm:px-4 py-3 flex items-center justify-between flex-wrap gap-3"
         style={{ background: "#0A1F3C" }}>
         {/* Brand */}
         <div className="flex items-center gap-3">
@@ -83,7 +83,7 @@ export default function PrototypeShell() {
         </div>
 
         {/* Role switcher — pill tabs with subtitle */}
-        <div className="flex gap-1.5 items-center">
+        <div className="flex gap-1.5 items-center overflow-x-auto max-w-full">
           {ROLES.map((role) => {
             const active = activeRole === role.id;
             return (

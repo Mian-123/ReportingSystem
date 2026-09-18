@@ -39,7 +39,7 @@ function initialsOf(name: string): string {
 }
 
 export default function DepartmentApp() {
-  const { workOrders, createWorkOrder, liveReports } = useAppState();
+  const { workOrders, createWorkOrder, liveReports, announcements } = useAppState();
 
   const [queueTab, setQueueTab] = usePersistentStateAfterMount<QueueTab>("cp.uco.queueTab", "review");
 
@@ -222,8 +222,21 @@ export default function DepartmentApp() {
           </div>
         </div>
 
+        {/* ── City announcements for UC Officers ── */}
+        {announcements.filter((a) => a.audience === "department" || a.audience === "all").length > 0 && (
+          <div className="rounded-2xl p-4 space-y-2" style={{ background: "#FFF8E1", border: "1px solid #C6A55C" }}>
+            <p className="text-sm font-bold" style={{ color: "#B8860B", fontFamily: "Outfit,sans-serif" }}>City announcements</p>
+            {announcements.filter((a) => a.audience === "department" || a.audience === "all").map((a) => (
+              <div key={a.id} className="bg-white rounded-xl p-3" style={{ border: "1px solid #E6E3DC" }}>
+                <p className="text-xs font-bold" style={{ color: "#16233A" }}>{a.title}</p>
+                <p className="text-[11px] mt-0.5" style={{ color: "#5A6B84" }}>{a.body}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* ── 2. KPI row ── */}
-        <div className="grid grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {[
             { label: "STREETS IN UC-14",  value: UC_STATS.streets,          color: "#16233A" },
             { label: "AVERAGE SCORE",      value: UC_STATS.avgScore,         color: "#0E8A5F" },
@@ -239,7 +252,7 @@ export default function DepartmentApp() {
         </div>
 
         {/* ── 3. Two-column row (map + queue) ── */}
-        <div className="grid gap-5" style={{ gridTemplateColumns: "58fr 42fr" }}>
+        <div className="grid gap-5 grid-cols-1 lg:grid-cols-2">
           {/* LEFT — Live map */}
           <div className="rounded-xl p-4" style={{ ...CARD }}>
             <p className="text-sm font-bold mb-3" style={{ color: "#16233A", fontFamily: "Outfit,sans-serif" }}>Live street map · UC-14</p>

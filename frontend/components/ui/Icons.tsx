@@ -136,18 +136,37 @@ export const IconZap = ({ size = 20, className = "" }: IconProps) => (
 );
 
 // Category badge — dark pill shape matching Digital Karachi screenshot style
-const CATEGORY_META: Record<string, { letter: string; bg: string }> = {
-  "Broken Road":              { letter: "BR", bg: "#16233A" },
-  "Garbage / Waste":          { letter: "GW", bg: "#1a3320" },
-  "Sewerage / Water":         { letter: "SW", bg: "#0E2A4E" },
-  "Streetlight":              { letter: "SL", bg: "#3a2a00" },
-  "Flooding / Standing Water":{ letter: "FL", bg: "#0a1f3c" },
-  "Safety Hazard":            { letter: "SH", bg: "#3a0a0a" },
-  "Drainage":                 { letter: "DR", bg: "#1a2744" },
-  "Infrastructure":           { letter: "IN", bg: "#1a1a2e" },
-  "Encroachment":             { letter: "EN", bg: "#2a1a00" },
-  "Other":                    { letter: "OT", bg: "#2a2a2a" },
+type CatIcon = "road" | "waste" | "water" | "light" | "flood" | "hazard" | "drain" | "infra" | "encroach" | "other";
+const CATEGORY_META: Record<string, { letter: string; bg: string; icon: CatIcon; emoji: string }> = {
+  "Broken Road":              { letter: "BR", bg: "#16233A", icon: "road",     emoji: "🕳️" },
+  "Garbage / Waste":          { letter: "GW", bg: "#1a3320", icon: "waste",    emoji: "🗑️" },
+  "Waste Management":         { letter: "WM", bg: "#1a3320", icon: "waste",    emoji: "🗑️" },
+  "Sewerage / Water":         { letter: "SW", bg: "#0E2A4E", icon: "water",    emoji: "💧" },
+  "Streetlight":              { letter: "SL", bg: "#3a2a00", icon: "light",    emoji: "💡" },
+  "Flooding / Standing Water":{ letter: "FL", bg: "#0a1f3c", icon: "flood",    emoji: "🌊" },
+  "Safety Hazard":            { letter: "SH", bg: "#3a0a0a", icon: "hazard",   emoji: "⚠️" },
+  "Drainage":                 { letter: "DR", bg: "#1a2744", icon: "drain",    emoji: "🔧" },
+  "Infrastructure":           { letter: "IN", bg: "#1a1a2e", icon: "infra",    emoji: "🏗️" },
+  "Encroachment":             { letter: "EN", bg: "#2a1a00", icon: "encroach", emoji: "🚧" },
+  "Other":                    { letter: "OT", bg: "#2a2a2a", icon: "other",    emoji: "📋" },
 };
+
+// Simple white line-icon per problem type (rendered inside the colored pill).
+function CategoryGlyph({ icon, size = 18 }: { icon: CatIcon; size?: number }) {
+  const p = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "#fff", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  switch (icon) {
+    case "road":     return (<svg {...p}><path d="M4 20 8 4M20 20 16 4"/><path d="M12 5v2M12 11v2M12 17v2"/></svg>);
+    case "waste":    return (<svg {...p}><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 15h10l1-15"/><path d="M10 10v7M14 10v7"/></svg>);
+    case "water":    return (<svg {...p}><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg>);
+    case "light":    return (<svg {...p}><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a6 6 0 0 0-4 10c1 1 1 2 1 3h6c0-1 0-2 1-3a6 6 0 0 0-4-10z"/></svg>);
+    case "flood":    return (<svg {...p}><path d="M2 12c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 18c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/></svg>);
+    case "hazard":   return (<svg {...p}><path d="M12 3 2 20h20L12 3z"/><path d="M12 9v5M12 17h.01"/></svg>);
+    case "drain":    return (<svg {...p}><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M6 6l12 12M18 6 6 18"/></svg>);
+    case "infra":    return (<svg {...p}><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg>);
+    case "encroach": return (<svg {...p}><path d="M4 20h16"/><path d="M7 20 10 6h4l3 14"/><path d="M9 12h6"/></svg>);
+    default:         return (<svg {...p}><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 9h6M9 13h6M9 17h3"/></svg>);
+  }
+}
 
 export function CategoryBadge({
   category,
@@ -156,19 +175,20 @@ export function CategoryBadge({
   category: string;
   size?: "sm" | "md" | "lg";
 }) {
-  const meta = CATEGORY_META[category] || { letter: category.substring(0, 2).toUpperCase(), bg: "#16233A" };
+  const meta = CATEGORY_META[category] || { letter: category.substring(0, 2).toUpperCase(), bg: "#16233A", icon: "other" as CatIcon, emoji: "📋" };
   const dims =
-    size === "lg" ? "w-14 h-9 text-xs rounded-2xl" :
-    size === "md" ? "w-12 h-8 text-[10px] rounded-xl" :
-    "w-10 h-6 text-[10px] rounded-lg";
+    size === "lg" ? "w-14 h-9 rounded-2xl" :
+    size === "md" ? "w-12 h-8 rounded-xl" :
+    "w-10 h-6 rounded-lg";
+  const emojiSize = size === "lg" ? 22 : size === "md" ? 18 : 15;
 
   return (
     <div
-      className={`${dims} flex items-center justify-center font-bold text-white flex-shrink-0`}
-      style={{ background: meta.bg, letterSpacing: "0.06em" }}
+      className={`${dims} flex items-center justify-center flex-shrink-0`}
+      style={{ background: meta.bg }}
       aria-label={category}
     >
-      {meta.letter}
+      <span style={{ fontSize: emojiSize, lineHeight: 1 }}>{meta.emoji}</span>
     </div>
   );
 }

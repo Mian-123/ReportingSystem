@@ -37,7 +37,7 @@ function liveStatusToType(s: "SUBMITTED" | "VERIFIED" | "REJECTED"): StatusType 
 }
 
 export default function CitizenApp() {
-  const { liveReports, addReport, workOrders, resolveWorkOrder, disputeWorkOrder, deleteReport } = useAppState();
+  const { liveReports, addReport, workOrders, resolveWorkOrder, disputeWorkOrder, deleteReport, announcements } = useAppState();
 
   const [view, setView]                     = usePersistentStateAfterMount<View>("cp.citizen.view", "home");
   const [selectedIncidentId, setSelectedId] = useState<string | null>(null);
@@ -312,102 +312,32 @@ export default function CitizenApp() {
           <div className="px-4 py-4">
             <p className="text-base font-bold mb-3" style={{ color: "#16233A", fontFamily: "Outfit,sans-serif" }}>My Reports</p>
 
-            {/* Live work orders — tracked with timestamps */}
+            {/* Live work orders — compact summaries; tap to open the tracker */}
             {workOrders.length > 0 && (
-              <div className="mb-5 space-y-4">
-                {workOrders.map((w) => (
-                  <div key={w.id} className="bg-white rounded-2xl p-4" style={{ boxShadow: "0 1px 4px rgba(10,31,60,0.08)", border: "1px solid #E6E3DC" }}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <p className="text-sm font-bold" style={{ color: "#16233A" }}>{w.category}</p>
-                        <p className="text-[11px] font-mono" style={{ color: "#5A6B84" }}>{w.shortCode}</p>
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-1 rounded-full"
-                        style={{ background: w.status === "RESOLVED" ? "#E7F4EF" : w.status === "COMPLETED" ? "#FFF8E1" : "#EAF0FA", color: w.status === "RESOLVED" ? "#0E8A5F" : w.status === "COMPLETED" ? "#B8860B" : "#0E2A4E" }}>
-                        {w.status.replace("_", " ")}
-                      </span>
-                    </div>
-
-                    {/* Before / After photos */}
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                      <div>
-                        <div className="h-20 rounded-xl flex items-center justify-center" style={{ background: "#0A1F3C" }}>
-                          <IconCamera size={20} color="rgba(255,255,255,0.5)" />
+              <div className="mb-5 space-y-2">
+                {workOrders.map((w) => {
+                  const statusBg = w.status === "RESOLVED" ? "#E7F4EF" : w.status === "COMPLETED" ? "#FFF8E1" : w.status === "DISPUTED" ? "#FEF0EE" : "#EAF0FA";
+                  const statusFg = w.status === "RESOLVED" ? "#0E8A5F" : w.status === "COMPLETED" ? "#B8860B" : w.status === "DISPUTED" ? "#C0392B" : "#0E2A4E";
+                  return (
+                    <button key={w.id}
+                      onClick={() => { setTrackReportId(w.citizenReportId || w.id); setView("track-report"); }}
+                      className="w-full text-left bg-white rounded-2xl p-4 flex items-start gap-3 transition-shadow hover:shadow-md"
+                      style={{ boxShadow: "0 1px 4px rgba(10,31,60,0.08)", border: "1px solid #E6E3DC" }}>
+                      <CategoryBadge category={w.category} size="lg" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="text-sm font-bold truncate" style={{ color: "#16233A" }}>{w.category}</p>
+                          <span className="text-[10px] font-bold px-2 py-1 rounded-full flex-shrink-0" style={{ background: statusBg, color: statusFg }}>{w.status.replace("_", " ")}</span>
                         </div>
-                        <p className="text-[10px] text-center mt-1" style={{ color: "#5A6B84" }}>Before</p>
-                      </div>
-                      <div>
-                        <div className="h-20 rounded-xl flex items-center justify-center overflow-hidden" style={{ background: w.contractorPhotoUrl ? "transparent" : "#F5F3EF", border: "1px solid #E6E3DC" }}>
-                          {w.contractorPhotoUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={w.contractorPhotoUrl} alt="After" className="w-full h-full object-cover" />
-                          ) : <IconCamera size={20} color="#B0BAC8" />}
-                        </div>
-                        <p className="text-[10px] text-center mt-1" style={{ color: "#5A6B84" }}>After</p>
-                      </div>
-                    </div>
-
-                    {/* Timestamped timeline */}
-                    <EventTimeline events={w.history} />
-
-                    {/* Rate & release payment card when contractor completed */}
-                    {w.status === "COMPLETED" && (
-                      <div className="mt-3 rounded-2xl p-4 text-center" style={{ background: "#FFF8E1", border: "1px solid #C6A55C" }}>
-                        <p className="text-sm font-bold" style={{ color: "#B8860B", fontFamily: "Outfit,sans-serif" }}>Work verified by Street Rep. Please review!</p>
-                        <p className="text-xs mt-1.5" style={{ color: "#5A6B84" }}>The contractor marked this issue as fixed. Confirm it is resolved and rate the work to release payment.</p>
-                        <div className="flex justify-center gap-1 my-3">
-                          {[1,2,3,4,5].map((s) => (
-                            <button key={s} onClick={() => setWoRating(s)} className="text-2xl" style={{ color: s <= woRating ? "#C6A55C" : "#D9D2C4" }}>★</button>
-                          ))}
-                        </div>
-                        <textarea value={woReview} onChange={(e) => setWoReview(e.target.value)}
-                          placeholder="Write a short review of the work (optional)…"
-                          className="w-full rounded-xl p-2.5 text-xs resize-none focus:outline-none bg-white mb-2"
-                          style={{ border: "1px solid #E6E3DC", color: "#16233A" }} rows={2} maxLength={300} />
-                        <button onClick={() => { resolveWorkOrder(w.id, woRating || 5); setWoReview(""); }}
-                          className="w-full py-3.5 rounded-2xl text-sm font-bold text-white" style={{ background: "#0E8A5F", fontFamily: "Outfit,sans-serif" }}>
-                          Submit Rating &amp; Release Payment
-                        </button>
-                        <button onClick={() => { disputeWorkOrder(w.id, "Citizen: there is still an issue with the work"); }}
-                          className="w-full mt-2 text-xs font-semibold underline" style={{ color: "#C0392B", background: "none", border: "none", cursor: "pointer" }}>Wait, there is still an issue!</button>
-                      </div>
-                    )}
-
-                    {w.status === "RESOLVED" && (
-                      <div className="mt-3 space-y-2">
-                        <div className="rounded-xl p-3 flex items-center gap-2" style={{ background: "#E7F4EF", border: "1px solid #0E8A5F" }}>
-                          <IconCheck size={16} color="#0E8A5F" />
-                          <p className="text-xs font-bold" style={{ color: "#0E8A5F" }}>Resolved · payment released{w.rating ? ` · you rated ${w.rating}★` : ""}</p>
-                        </div>
-                        {w.disputeReason ? (
-                          <div className="rounded-xl p-3" style={{ background: "#FEF0EE", border: "1px solid #F3C0BA" }}>
-                            <p className="text-[11px] font-bold" style={{ color: "#C0392B" }}>You reported a problem with this work</p>
-                            <p className="text-[11px] italic mt-0.5" style={{ color: "#5A6B84" }}>&ldquo;{w.disputeReason}&rdquo;</p>
-                          </div>
-                        ) : reopenForId === w.id ? (
-                          <div className="rounded-xl p-3" style={{ background: "#FEF0EE", border: "1px solid #F3C0BA" }}>
-                            <p className="text-xs font-semibold mb-1.5" style={{ color: "#C0392B" }}>Report a problem with this completed work</p>
-                            <textarea value={reopenReason} onChange={(e) => setReopenReason(e.target.value)}
-                              placeholder="e.g. the pothole reappeared after two days…"
-                              className="w-full rounded-lg p-2.5 text-xs resize-none focus:outline-none bg-white"
-                              style={{ border: "1px solid #E6E3DC", color: "#16233A" }} rows={3} maxLength={400} />
-                            <div className="flex gap-2 mt-2">
-                              <button onClick={() => { disputeWorkOrder(w.id, reopenReason || "Citizen reported a problem with the completed work"); setReopenForId(null); setReopenReason(""); }}
-                                className="flex-1 py-2 rounded-lg text-xs font-bold text-white" style={{ background: "#C0392B" }}>Submit to UC Officer</button>
-                              <button onClick={() => { setReopenForId(null); setReopenReason(""); }}
-                                className="flex-1 py-2 rounded-lg text-xs font-semibold" style={{ background: "white", color: "#5A6B84", border: "1px solid #E6E3DC" }}>Cancel</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <button onClick={() => { setReopenForId(w.id); setReopenReason(""); }}
-                            className="w-full py-2.5 rounded-xl text-xs font-semibold" style={{ background: "#FEF0EE", color: "#C0392B", border: "1px solid #F3C0BA" }}>
-                            Report a problem with this work
-                          </button>
+                        <p className="text-[11px] font-mono mb-1" style={{ color: "#5A6B84" }}>{w.shortCode}</p>
+                        {w.status === "COMPLETED" && (
+                          <p className="text-[11px] font-semibold" style={{ color: "#B8860B" }}>Action needed · rate &amp; release payment</p>
                         )}
+                        <p className="text-[10px] mt-1 font-semibold" style={{ color: "#0E8A5F" }}>Tap to track →</p>
                       </div>
-                    )}
-                  </div>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
@@ -515,6 +445,20 @@ export default function CitizenApp() {
         {view === "alerts" && (
           <div className="px-4 py-4">
             <p className="text-base font-bold mb-3" style={{ color: "#16233A", fontFamily: "Outfit,sans-serif" }}>Notifications</p>
+            {announcements.filter((a) => a.audience === "citizen" || a.audience === "all").length > 0 && (
+              <div className="space-y-2 mb-4">
+                {announcements.filter((a) => a.audience === "citizen" || a.audience === "all").map((a) => (
+                  <div key={a.id} className="bg-white rounded-2xl p-3" style={{ border: "1px solid #C6A55C", borderLeftWidth: 4, boxShadow: "0 1px 3px rgba(10,31,60,0.07)" }}>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#FFF8E1", color: "#B8860B" }}>City Announcement</span>
+                      <span className="text-[10px]" style={{ color: "#5A6B84" }}><ClientTime date={a.createdAt} format="relative" /></span>
+                    </div>
+                    <p className="text-sm font-bold" style={{ color: "#16233A" }}>{a.title}</p>
+                    <p className="text-xs mt-0.5" style={{ color: "#5A6B84" }}>{a.body}</p>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="space-y-2">
               {MOCK_NOTIFICATIONS.map((n) => (
                 <div key={n.id} className="bg-white rounded-2xl border p-3"
@@ -823,7 +767,9 @@ export default function CitizenApp() {
         {/* ══ TRACK REPORT (live report timeline) ═══════════════════════════ */}
         {view === "track-report" && (() => {
           const rep = liveReports.find((r) => r.id === trackReportId);
-          if (!rep) {
+          // A tracker can be opened from a live report OR directly from a work order.
+          const woDirect = workOrders.find((w) => w.id === trackReportId || (rep && w.citizenReportId === rep.id));
+          if (!rep && !woDirect) {
             return (
               <div className="px-4 py-6">
                 <button onClick={() => setView("my-reports")} className="flex items-center gap-1 text-xs mb-3" style={{ color: "#5A6B84" }}>
@@ -833,14 +779,24 @@ export default function CitizenApp() {
               </div>
             );
           }
-          const wo = workOrders.find((w) => w.citizenReportId === rep.id);
+          const wo = woDirect;
+          // Unified view model: prefer the live report, else fall back to the work order.
+          const info = {
+            category: rep?.category ?? wo?.category ?? "",
+            shortCode: rep?.shortCode ?? wo?.shortCode ?? "",
+            description: rep?.description ?? wo?.description ?? "",
+            address: rep?.address ?? rep?.street ?? wo?.address ?? "",
+            photoDataUrl: rep?.photoDataUrl ?? wo?.citizenPhotoUrl,
+          };
           // Build timeline events from the report + any linked work order
           const events = wo
             ? wo.history
-            : [
+            : rep
+            ? [
                 { key: "reported", label: "Reported", sublabel: "You submitted", at: rep.submittedAt },
                 ...(rep.repVerified ? [{ key: "verified", label: "Verified", sublabel: "Street Rep verified", at: rep.submittedAt }] : []),
-              ];
+              ]
+            : [];
           return (
             <div className="px-4 py-4">
               <button onClick={() => setView("my-reports")} className="flex items-center gap-1 text-xs mb-3" style={{ color: "#5A6B84" }}>
@@ -850,26 +806,26 @@ export default function CitizenApp() {
               {/* Report header */}
               <div className="bg-white rounded-2xl border p-4 mb-3" style={{ borderColor: "#E6E3DC", boxShadow: "0 1px 4px rgba(10,31,60,0.08)" }}>
                 <div className="flex items-start gap-3">
-                  <CategoryBadge category={rep.category} size="lg" />
+                  <CategoryBadge category={info.category} size="lg" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-sm font-bold" style={{ color: "#16233A" }}>{rep.category}</p>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "#EAF0FA", color: "#0E2A4E" }}>{rep.shortCode}</span>
+                      <p className="text-sm font-bold" style={{ color: "#16233A" }}>{info.category}</p>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "#EAF0FA", color: "#0E2A4E" }}>{info.shortCode}</span>
                     </div>
-                    <p className="text-xs" style={{ color: "#5A6B84" }}>{rep.description}</p>
+                    <p className="text-xs" style={{ color: "#5A6B84" }}>{info.description}</p>
                     <div className="flex items-start gap-1.5 mt-2">
                       <IconMapPin size={12} color="#0E8A5F" />
-                      <p className="text-[11px]" style={{ color: "#5A6B84" }}>{rep.address || rep.street}</p>
+                      <p className="text-[11px]" style={{ color: "#5A6B84" }}>{info.address}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Photo */}
-              {rep.photoDataUrl && (
+              {info.photoDataUrl && (
                 <div className="rounded-2xl overflow-hidden mb-3" style={{ maxHeight: 180 }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={rep.photoDataUrl} alt="Report" className="w-full object-cover" style={{ maxHeight: 180 }} />
+                  <img src={info.photoDataUrl} alt="Report" className="w-full object-cover" style={{ maxHeight: 180 }} />
                 </div>
               )}
 

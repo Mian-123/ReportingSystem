@@ -39,7 +39,7 @@ export default function StreetRepApp() {
   const [replyMsgId, setReplyMsgId]         = useState<string|null>(null);
 
   const area             = MOCK_STREET_AREA;
-  const { liveReports, verifyReport: verifyLiveReport, rejectReport: rejectLiveReport, workOrders, disputeWorkOrder } = useAppState();
+  const { announcements, liveReports, verifyReport: verifyLiveReport, rejectReport: rejectLiveReport, workOrders, disputeWorkOrder } = useAppState();
 
   // Combine live submitted reports + static pending
   const livePending = liveReports
@@ -623,6 +623,16 @@ export default function StreetRepApp() {
             <button onClick={() => setView("home")} className="flex items-center gap-1 text-xs mb-3" style={{ color: "#5A6B84" }}><IconArrowLeft size={12} /> Back</button>
             <p className="text-base font-bold mb-3" style={{ color: "#16233A", fontFamily: "Outfit,sans-serif" }}>Citizen Messages</p>
             <div className="space-y-2">
+              {announcements.filter((a) => a.audience === "street-rep" || a.audience === "all").map((a) => (
+                <div key={a.id} className="bg-white rounded-2xl border p-3 mb-2" style={{ borderColor: "#C6A55C", borderLeftWidth: 4 }}>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#FFF8E1", color: "#B8860B" }}>City Announcement</span>
+                    <span className="text-[10px]" style={{ color: "#5A6B84" }}><ClientTime date={a.createdAt} format="relative" /></span>
+                  </div>
+                  <p className="text-sm font-bold" style={{ color: "#16233A" }}>{a.title}</p>
+                  <p className="text-xs mt-0.5" style={{ color: "#5A6B84" }}>{a.body}</p>
+                </div>
+              ))}
               {MOCK_CITIZEN_MESSAGES.map((msg) => (
                 <div key={msg.id}>
                   <button onClick={() => setReplyMsgId(replyMsgId === msg.id ? null : msg.id)}
